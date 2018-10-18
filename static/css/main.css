@@ -1,0 +1,131 @@
+html, body {
+  height: 100%;
+  margin: 0;
+  font-size: 62.5%; }
+
+.doc-wrap {
+  margin: 0;
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column; }
+  .doc-wrap > .top-panel {
+    flex: 0 0 55%;
+    background: #D97; }
+  .doc-wrap > .side-panel {
+    flex: 0 0 45%;
+    background: #3DF; }
+  .doc-wrap.landscape {
+    flex-direction: row; }
+
+.grid {
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap; }
+  .grid.rotate {
+    flex-direction: row; }
+  .grid.div-3 > .grid-cell {
+    flex: 0 0 33.3333%; }
+  .grid.div-7 > .grid-cell {
+    flex: 0 0 14.2857%; }
+  .grid > .full.grid-cell {
+    flex: 0 0 100%;
+    min-height: 3rem; }
+
+.grid-cell {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  flex-grow: 1;
+  box-sizing: border-box;
+  transition: 0.2s all ease-in-out;
+  min-height: 6rem; }
+
+.date-grid {
+  padding: 1rem;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box; }
+  .date-grid .card {
+    overflow: hidden;
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    bottom: 2px;
+    right: 2px;
+    border-radius: 3px;
+    border: 2px solid;
+    box-sizing: border-box;
+    color: #fff;
+    transition: all 0.4s ease-out;
+    cursor: pointer;
+    text-shadow: 1px 1px 0px #222; }
+    .date-grid .card:active {
+      transform: translate(1px, 1px); }
+    .date-grid .card.disabled {
+      border-color: #b0b0b0;
+      background-color: #ededed;
+      color: #333;
+      text-shadow: 1px 1px 0px #999; }
+    .date-grid .card .content {
+      display: -webkit-flex;
+      display: flex;
+      flex-direction: column;
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      top: 0;
+      z-index: 4; }
+      .date-grid .card .content h5 {
+        user-select: none;
+        flex: 0 0 33.3333%;
+        margin: 0;
+        padding: 2px;
+        font-family: "Trebuchet MS", Helvetica, "Microsoft JhengHei UI", sans-serif;
+        font-weight: bold; }
+        .date-grid .card .content h5 small {
+          padding: 0.1em 0.2em;
+          font-size: 0.9em;
+          color: rgba(255, 255, 255, 0.75); }
+      .date-grid .card .content p {
+        font-weight: bolder;
+        user-select: none;
+        flex: 0 0 66.6666%;
+        margin: 0;
+        padding: 0;
+        display: -webkit-flex;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "Trebuchet MS", Helvetica, "Microsoft JhengHei UI", sans-serif; }
+    .date-grid .card.disabled .content h5 small {
+      color: #555; }
+    .date-grid .card .overlay {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      top: 0;
+      z-index: 2; }
+    .date-grid .card .colorbar {
+      transition: all 0.4s ease-out;
+      position: absolute;
+      box-sizing: border-box;
+      z-index: 0;
+      border-radius: 4px;
+      left: 0;
+      bottom: 0;
+      top: 0;
+      right: 0; }
+  .date-grid .full.card .content {
+    flex-direction: row; }
+    .date-grid .full.card .content h5 {
+      flex: 0 0 25%; }
+    .date-grid .full.card .content p {
+      justify-content: flex-start; }
+
+/*# sourceMappingURL=main.css.map */
