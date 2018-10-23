@@ -5,8 +5,11 @@ const colorAlert = "e0970f";
 const colorOver = "950000";
 const warnline = 0.7;
 const headFitRate = 0.4;
-const descFitRate = 0.35;
-const tableContainer = $(".date-grid");
+const descFitRate = 0.36;
+const fullHeadFitRate = 1;
+const fullDescFitRate = 2;
+const tileGrid = $(".date-grid.tile-grid");
+const barGrid = $(".date-grid.bar-grid");
 
 let screenDirection;
 
@@ -244,15 +247,7 @@ const sampleData = {
       name: "OTHER",
       owner: "others",
       isFull: true,
-      limit: "$MIN($MONTH_LIMIT-$CASHOUT_TOTAL, 3000)",
-      cashIn: {
-        func: "sum",
-        fields: "cashIn"
-      },
-      cashOut: {
-        func: "sum",
-        fields: "cashOut"
-      }
+      limit: "MIN($MONTH_LIMIT-$CASHOUT_TOTAL, 3000)"
     },
     {
       name: "TOTAL",
@@ -260,11 +255,11 @@ const sampleData = {
       limit: "$MONTH_LIMIT+$CASHIN_TOTAL",
       cashIn: {
         func: "sum",
-        fields: "cashIn"
+        field: "cashIn"
       },
       cashOut: {
         func: "sum",
-        fields: "cashOut"
+        field: "cashOut"
       },
       display: {
         head: "TOTAL"
@@ -274,14 +269,24 @@ const sampleData = {
 };
 
 var viewdata = {};
+var customdata = {};
 var utils = {};
 var funcs = {};
 var events = {};
 
 utils.calc = function (exp) {
-  return new Function(
-    "var dom = {}; var __ = {}; var utils = {}; var json = {}; return " + exp
-  )();
+  var MIN = this.MIN;
+  var MAX = this.MAX;
+  var $MONTH_LIMIT = this.MONTH_LIMIT;
+  var $MONTH = this.MONTH;
+  var $YEAR = this.YEAR;
+  var $START_DATE = this.START_DATE;
+  var $MAX_DATE = this.MAX_DATE;
+  var $WEEKDAY_NAMES = this.WEEKDAY_NAMES;
+  var $WEEKDAY_FULLNAMES = this.WEEKDAY_FULLNAMES;
+  var $CASHIN_TOTAL = this.CASHIN_TOTAL;
+  var $CASHOUT_TOTAL = this.CASHOUT_TOTAL;
+  return eval(exp);
 };
 
 utils.pad = function (num) {
@@ -289,15 +294,16 @@ utils.pad = function (num) {
 };
 
 utils.convertNumber = function (number, format) {
+  var num = Number.isNaN(number) ? 0 : number;
   const re = /\{[^:{}]+:?([^:{}]*?)\}/g;
   var m = re.exec(format);
   if (m !== null) {
     var pattern = m[1];
-    if (pattern === "d") return parseInt(number);
+    if (pattern === "d") return parseInt(num);
     var n = /\.(\d+)f/g.exec(m);
     if (n !== null) {
       var decilen = parseInt(n[1]);
-      return parseFloat(number).toFixed(decilen);
+      return parseFloat(num).toFixed(decilen);
     }
   }
 };
@@ -337,16 +343,9 @@ funcs.buildCardsData = function (json) {
     "金曜日",
     "土曜日"
   ];
-  var $MAX = $defs.MAX;
-  var $MIN = $defs.MIN;
-  var $MONTH_LIMIT = $defs.MONTH_LIMIT;
-  var $YEAR = $defs.YEAR;
-  var $MONTH = $defs.MONTH;
-  var $START_DATE = $defs.START_DATE;
-  var $MAX_DATE = $defs.MAX_DATE;
 
   var __ = {
-    cards: [],
+    cards: {},
     display: {
       portrait: Object.assign({}, json.display.default, json.display.portrait),
       landscape: Object.assign({}, json.display.default, json.display.landscape)
@@ -366,17 +365,19 @@ funcs.buildCardsData = function (json) {
         .replace(/\{date\}/g, vd.date.getDate() || "undefined")
         .replace(/\{name\}/, vd.conf.name);
     },
-    buildCard: function (key, isCustom, viewdata, firstRecord) {
+    buildCard: function (key, isCustom, viewdata, firstRecord, isFull = false) {
       var fr = firstRecord || {
         undefined: true
       };
+      var limit = utils.calc.call($defs, viewdata.conf.limit);
       return {
         list: fr["undefined"] ? [] : [fr],
         srcKey: key,
         isCustom: isCustom,
-        cashIn: fr.cashIn || 0,
-        cashOut: fr.cashOut || 0,
-        limit: json.dayLimit || 0,
+        isFull: viewdata.conf.isFull || false,
+        cashIn: parseFloat(fr.cashIn) || 0,
+        cashOut: parseFloat(fr.cashOut) || 0,
+        limit: limit || parseFloat(json.dayLimit) || 0,
         head_port: __.applyTemplate(
           isCustom ? __.display.portrait.custHead : __.display.portrait.head,
           viewdata
@@ -394,6 +395,26 @@ funcs.buildCardsData = function (json) {
           viewdata
         )
       };
+    },
+    applyFilter: function (filter) {
+      var records = JSON.parse(JSON.stringify(json.billings));
+      var result = 0;
+      if (filter.filters) {
+        for (var i in filter.filters) {
+          var f = filter.filters[i];
+          records = records.filter(function (x) {
+            return utils.calc.call(x, f);
+          });
+        }
+      }
+      if (filter.func && filter.func === 'sum') {
+        if (filter.field) {
+          for (var i in records) {
+            result += parseFloat(records[i][filter.field]) || 0;
+          }
+        }
+      }
+      return result;
     }
   };
 
@@ -418,6 +439,9 @@ funcs.buildCardsData = function (json) {
     __.cards[key] = c;
   }
 
+  // Build card viewdata with billings.
+  $defs.CASHIN_TOTAL = 0;
+  $defs.CASHOUT_TOTAL = 0;
   for (var i in json.billings) {
     var b = json.billings[i];
     var key = "";
@@ -442,6 +466,8 @@ funcs.buildCardsData = function (json) {
       continue;
     }
 
+    $defs.CASHIN_TOTAL = parseFloat(b.cashIn) || 0;
+    $defs.CASHOUT_TOTAL = parseFloat(b.cashOut) || 0;
     var ori = __.cards[key];
     if (ori) {
       funcs.insertRecord(__.cards, b);
@@ -451,10 +477,29 @@ funcs.buildCardsData = function (json) {
     }
   }
 
+  // Build card viewdata with custom filters.
+  for (var i in json.customCard) {
+    var cus = JSON.parse(JSON.stringify(json.customCard[i]));
+    viewdata.conf = cus;
+    if ('owner' in cus) {
+      continue;
+    }
+    var cashInFilter = cus.cashIn;
+    var cashOutFilter = cus.cashOut;
+    cus.cashIn = __.applyFilter(cashInFilter);
+    cus.cashOut = __.applyFilter(cashOutFilter);
+    cus.limit = utils.calc.call($defs, cus.limit);
+    var card = __.buildCard(cus.name, true, viewdata, {
+      cashIn: cus.cashIn,
+      cashOut: cus.cashOut
+    });
+    customdata[cus.name] = card;
+  }
+
   return __.cards;
 };
 
-funcs.updateData = function (e, json, conf) {
+funcs.updateData = function (e, json, conf, type = 'tile') {
   var __ = {};
   var el = $(e);
 
@@ -471,7 +516,7 @@ funcs.updateData = function (e, json, conf) {
 
   if (__.cntel.length === 0) {
     var $el = $('<div class="grid-cell"></div>');
-    tableContainer.append($el);
+    json.isFull ? barGrid.append($el) : tileGrid.append($el);
     __.cntel = $el;
   }
   __.el = __.cntel.children(".card");
@@ -486,21 +531,27 @@ funcs.updateData = function (e, json, conf) {
     __.el = $el;
   }
   __.applyTemplate = function (tpl) {
+    var cashIn = parseFloat(json.cashIn) || 0;
+    var cashOut = parseFloat(json.cashOut) || 0;
     return tpl
       .replace(/\{in\:?.*?\}/g, function (x) {
-        return utils.convertNumber(json.cashIn, x);
+        return utils.convertNumber(cashIn, x);
       })
       .replace(/\{out\:?.*?\}/g, function (x) {
-        return utils.convertNumber(json.cashOut, x);
+        return utils.convertNumber(cashOut, x);
       })
       .replace(/\{total\:?.*?\}/g, function (x) {
-        return utils.convertNumber(json.cashOut - json.cashIn, x);
+        return utils.convertNumber(cashOut - cashIn, x);
       });
   };
   __.el.attr("data-key", json.srcKey);
   __.el.attr("data-limit", json.limit);
   __.el.attr("data-in", json.cashIn);
   __.el.attr("data-out", json.cashOut);
+  if (json.isFull) {
+    __.cntel.addClass("full");
+    __.el.addClass("full");
+  }
   __.dir = __.el.attr("data-direction");
   __.disabled = __.el.hasClass("disabled");
   if (__.dir === "|") {
@@ -665,6 +716,15 @@ events.cardDirectionChanged = function (el) {
   funcs.updateContent(el);
 };
 
+events.screenDirectionChanged = function () {
+  var e = $(".doc-wrap");
+  if (screenDirection === '-') {
+    if (!e.hasClass("landscape")) e.addClass("landscape");
+  } else if (screenDirection === '|') {
+    e.removeClass("landscape");
+  }
+}
+
 funcs.updateView = function (el) {
   var el = $(el);
   if (el.hasClass("disabled")) {
@@ -734,6 +794,7 @@ funcs.buildProcessBackground = function (color, ratio, dir) {
 funcs.updateContent = function (el) {
   var card = $(el);
   var isDataUpdated = card.attr("data-changed");
+  var isFull = card.hasClass("full");
   if (!isDataUpdated) isDataUpdated = "true";
   if (isDataUpdated.toLowerCase() === "false") {
     return;
@@ -756,8 +817,8 @@ funcs.updateContent = function (el) {
   var captext = card.attr("data-head");
   var oritext = caphead.html();
   captext != oritext && caphead.html(captext);
-  caphead.fitText(headFitRate, {
-    maxFontSize: "14px"
+  caphead.fitText(isFull ? fullHeadFitRate : headFitRate, {
+    maxFontSize: "20px"
   });
   var desctext = card.attr("data-desc");
   var desbox = cnt.children("p");
@@ -768,8 +829,8 @@ funcs.updateContent = function (el) {
   }
   var oridesc = desbox.html();
   desbox != oridesc && desbox.html(desctext);
-  desbox.fitText(descFitRate, {
-    maxFontSize: "16px"
+  desbox.fitText(isFull ? fullDescFitRate : descFitRate, {
+    maxFontSize: "24px"
   });
   card.attr("data-changed", "false");
 };
@@ -782,7 +843,8 @@ $(window).on("resize", function () {
 });
 
 $(document).ready(function () {
-  viewdata = funcs.buildCardsData(sampleData);
+  var bi = sampleData;
+  viewdata = funcs.buildCardsData(bi);
   var dynamicValue = 0;
   var dynamicTick = function () {
     var el = $(".date-grid .card.dynamic");
@@ -833,6 +895,16 @@ $(document).ready(function () {
       );
     }
   });
+  for (var k in bi.customCard) {
+    var e = bi.customCard[k];
+    if ('owner' in e) {
+      var json = viewdata[e.owner];
+      funcs.updateData(undefined, json);
+    } else {
+      var json = customdata[e.name];
+      funcs.updateData(undefined, json);
+    }
+  }
 
   utils.meatureDoc();
   $(".date-grid .card").each(function () {
